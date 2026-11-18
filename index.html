@@ -13,6 +13,7 @@
             padding: 15px;
             margin: 0;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
         h1 {
             color: #2c3e50;
@@ -96,6 +97,7 @@
             font-weight: bold;
             color: #27ae60;
             font-size: 0.9rem;
+            min-height: 1.2rem;
         }
     </style>
 </head>
@@ -141,6 +143,8 @@
 
     function placeWords() {
         grid = Array(size).fill(null).map(() => Array(size).fill(''));
+        
+        // Ваш оригінальний алгоритм розміщення
         const placements = [
             {r: 0, c: 0, h: true, w: "ARBEITEN"},
             {r: 1, c: 0, h: true, w: "FIRMA"},
@@ -180,7 +184,14 @@
                 cell.dataset.row = r;
                 cell.dataset.col = c;
                 cell.textContent = grid[r][c];
-                cell.onclick = () => toggleCell(cell, r, c);
+                
+                // Працює і на ноутбуці (клік), і на телефоні (дотик)
+                cell.addEventListener('click', () => toggleCell(cell, r, c));
+                cell.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    toggleCell(cell, r, c);
+                }, { passive: false });
+
                 gridEl.appendChild(cell);
             }
         }
