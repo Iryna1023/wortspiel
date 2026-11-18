@@ -105,34 +105,34 @@
 
 <div class="container">
     <h1>Wortsuchrätsel</h1>
-    <p style="font-size: 0.8rem; color: #666; margin-top:0;">Найдите 10 слов по теме «Компания»</p>
+    <p style="font-size: 0.8rem; color: #666; margin-top:0;">Znajdź 10 słów na temat „Firma”</p>
     
     <div class="grid" id="grid"></div>
     
     <div class="btn-container">
-        <button onclick="resetGame()" style="background: #95a5a6;">Сброс</button>
+        <button onclick="resetGame()" style="background: #95a5a6;">Reset</button>
     </div>
 
     <div id="message"></div>
 
     <div class="word-list">
-        <strong>Слова для поиска (A1-A2):</strong>
+        <strong>Słowa do znalezienia (A1-A2):</strong>
         <ul id="wordListUI"></ul>
     </div>
 </div>
 
 <script>
     const words = [
-        { de: "ARBEITEN", ru: "работать" },
-        { de: "LEITEN", ru: "управлять" },
-        { de: "VERKAUFEN", ru: "продавать" },
-        { de: "KAUFEN", ru: "покупать" },
-        { de: "PLANEN", ru: "планировать" },
-        { de: "VERDIENEN", ru: "зарабатывать" },
-        { de: "BEZAHLEN", ru: "платить" },
-        { de: "BESTELLEN", ru: "заказывать" },
-        { de: "LIEFERN", ru: "поставлять" },
-        { de: "FIRMA", ru: "фирма" }
+        { de: "ARBEITEN", pl: "pracować" },
+        { de: "LEITEN", pl: "zarządzać" },
+        { de: "VERKAUFEN", pl: "sprzedawać" },
+        { de: "KAUFEN", pl: "kupować" },
+        { de: "PLANEN", pl: "planować" },
+        { de: "VERDIENEN", pl: "zarabiać" },
+        { de: "BEZAHLEN", pl: "płacić" },
+        { de: "BESTELLEN", pl: "zamawiać" },
+        { de: "LIEFERN", pl: "dostarczać" },
+        { de: "FIRMA", pl: "firma" }
     ];
 
     const size = 10;
@@ -226,7 +226,7 @@
         words.forEach(w => {
             const li = document.createElement('li');
             li.className = 'word-item ' + (foundWords.has(w.de) ? 'found' : '');
-            li.textContent = `${w.de} — ${w.ru}`;
+            li.textContent = `${w.de} — ${w.pl}`;
             listEl.appendChild(li);
         });
     }
@@ -291,7 +291,6 @@
         const r = parseInt(cell.dataset.row);
         const c = parseInt(cell.dataset.col);
         
-        // Перевіряємо, чи клітинка вже вибрана
         if (!selectedCells.some(item => item.r === r && item.c === c)) {
             selectedCells.push({ r, c, element: cell });
             cell.classList.add('selected');
@@ -317,11 +316,11 @@
                 item.element.classList.add('found');
             });
             msg.style.color = '#27ae60';
-            msg.textContent = `Найдено слово: ${matched.de}!`;
+            msg.textContent = `Znaleziono słowo: ${matched.de}!`;
             setTimeout(() => msg.textContent = '', 2000);
         } else {
             msg.style.color = '#e74c3c';
-            msg.textContent = 'Неверно';
+            msg.textContent = 'Niepoprawnie';
             setTimeout(() => {
                 msg.textContent = '';
             }, 1500);
@@ -333,7 +332,7 @@
 
         if (foundWords.size === words.length) {
             msg.style.color = '#27ae60';
-            msg.textContent = 'Поздравляем! Все слова найдены!';
+            msg.textContent = 'Gratulacje! Wszystkie słowa znalezione!';
         }
     }
 
