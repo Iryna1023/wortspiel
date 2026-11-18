@@ -10,7 +10,7 @@
             background-color: #f4f4f9;
             color: #333;
             text-align: center;
-            padding: 20px;
+            padding: 15px;
             margin: 0;
             -webkit-tap-highlight-color: transparent;
         }
@@ -47,7 +47,6 @@
             cursor: pointer;
             user-select: none;
             -webkit-user-select: none;
-            transition: background 0.2s;
         }
         .cell.selected {
             background: #3498db;
@@ -121,7 +120,7 @@
 </div>
 
 <script>
-    const words = [
+    var words = [
         { de: "ARBEITEN", ru: "работать" },
         { de: "LEITEN", ru: "управлять" },
         { de: "VERKAUFEN", ru: "продавать" },
@@ -134,15 +133,21 @@
         { de: "FIRMA", ru: "фирма" }
     ];
 
-    const size = 10;
-    let grid = Array(size).fill(null).map(() => Array(size).fill(''));
-    let selectedCells = [];
-    let foundWords = new Set();
+    var size = 10;
+    var grid = [];
+    var selectedCells = [];
+    var foundWords = [];
 
     function placeWords() {
-        grid = Array(size).fill(null).map(() => Array(size).fill(''));
+        grid = [];
+        for (var r = 0; r < size; r++) {
+            grid[r] = [];
+            for (var c = 0; c < size; c++) {
+                grid[r][c] = '';
+            }
+        }
 
-        const placements = [
+        var placements = [
             {r: 0, c: 0, h: true, w: "ARBEITEN"},
             {r: 1, c: 0, h: true, w: "FIRMA"},
             {r: 2, c: 0, h: true, w: "LEITEN"},
@@ -155,15 +160,15 @@
             {r: 9, c: 0, h: true, w: "LIEFERN"}
         ];
 
-        placements.forEach(p => {
-            for (let i = 0; i < p.w.length; i++) {
+        placements.forEach(function(p) {
+            for (var i = 0; i < p.w.length; i++) {
                 if (p.h) grid[p.r][p.c + i] = p.w[i];
             }
         });
 
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
+        var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (var r = 0; r < size; r++) {
+            for (var c = 0; c < size; c++) {
                 if (!grid[r][c]) {
                     grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
                 }
@@ -172,28 +177,35 @@
     }
 
     function renderGrid() {
-        const gridEl = document.getElementById('grid');
+        var gridEl = document.getElementById('grid');
         gridEl.innerHTML = '';
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-                const cell = document.createElement('div');
+        for (var r = 0; r < size; r++) {
+            for (var c = 0; c < size; c++) {
+                var cell = document.createElement('div');
                 cell.className = 'cell';
-                cell.dataset.row = r;
-                cell.dataset.col = c;
+                cell.setAttribute('data-row', r);
+                cell.setAttribute('data-col', c);
                 cell.textContent = grid[r][c];
-                cell.onclick = () => toggleCell(cell, r, c);
+                
+                (function(cel, row, col) {
+                    cel.onclick = function() {
+                        toggleCell(cel, row, col);
+                    };
+                })(cell, r, c);
+
                 gridEl.appendChild(cell);
             }
         }
     }
 
     function renderWordList() {
-        const listEl = document.getElementById('wordListUI');
+        var listEl = document.getElementById('wordListUI');
         listEl.innerHTML = '';
-        words.forEach(w => {
-            const li = document.createElement('li');
-            li.className = 'word-item ' + (foundWords.has(w.de) ? 'found' : '');
-            li.textContent = `${w.de} — ${w.ru}`;
+        words.forEach(function(w) {
+            var li = document.createElement('li');
+            var isFound = foundWords.indexOf(w.de) > -1;
+            li.className = 'word-item ' + (isFound ? 'found' : '');
+            li.textContent = w.de + ' — ' + w.ru;
             listEl.appendChild(li);
         });
     }
@@ -201,51 +213,75 @@
     function toggleCell(cell, r, c) {
         if (cell.classList.contains('found')) return;
         cell.classList.toggle('selected');
-        const index = selectedCells.findIndex(item => item.r === r && item.c === c);
+        
+        var index = -1;
+        for (var i = 0; i < selectedCells.length; i++) {
+            if (selectedCells[i].r === r && selectedCells[i].c === c) {
+                index = i;
+                break;
+            }
+        }
+
         if (index > -1) {
             selectedCells.splice(index, 1);
         } else {
-            selectedCells.push({r, c});
+            selectedCells.push({r: r, c: c});
         }
     }
 
     function checkSelection() {
-        selectedCells.sort((a, b) => a.r - b.r || a.c - b.c);
-        let wordStr = selectedCells.map(item => grid[item.r][item.c]).join('');
-        
-        let matched = words.find(w => w.de === wordStr || w.de === wordStr.split('').reverse().join(''));
-        
-        const msg = document.getElementById('message');
-        if (matched && !foundWords.has(matched.de)) {
-            foundWords.add(matched.de);
-            selectedCells.forEach(item => {
-                const cellEl = document.querySelector(`[data-row='${item.r}'][data-col='${item.c}']`);
+        selectedCells.sort(function(a, b) {
+            return a.r - b.r || a.c - b.c;
+        });
+
+        var wordStr = '';
+        for (var i = 0; i < selectedCells.length; i++) {
+            wordStr += grid[selectedCells[i].r][selectedCells[i].c];
+        }
+
+        var matched = null;
+        for (var i = 0; i < words.length; i++) {
+            var wRev = words[i].de.split('').reverse().join('');
+            if (words[i].de === wordStr || words[i].de === wRev) {
+                matched = words[i];
+                break;
+            }
+        }
+
+        var msg = document.getElementById('message');
+        if (matched && foundWords.indexOf(matched.de) === -1) {
+            foundWords.push(matched.de);
+            selectedCells.forEach(function(item) {
+                var cellEl = document.querySelector('[data-row="' + item.r + '"][data-col="' + item.c + '"]');
                 if (cellEl) {
                     cellEl.classList.remove('selected');
                     cellEl.classList.add('found');
                 }
             });
-            msg.textContent = `Найдено слово: ${matched.de}!`;
-            setTimeout(() => msg.textContent = '', 2000);
+            msg.textContent = 'Найдено слово: ' + matched.de + '!';
+            setTimeout(function() { msg.textContent = ''; }, 2000);
         } else {
             msg.textContent = 'Неверно, попробуйте еще раз';
             msg.style.color = '#e74c3c';
-            setTimeout(() => {
+            setTimeout(function() {
                 msg.textContent = '';
                 msg.style.color = '#27ae60';
             }, 2000);
-            document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
+            var selectedEls = document.querySelectorAll('.cell.selected');
+            for (var i = 0; i < selectedEls.length; i++) {
+                selectedEls[i].classList.remove('selected');
+            }
         }
         selectedCells = [];
         renderWordList();
 
-        if (foundWords.size === words.length) {
+        if (foundWords.length === words.length) {
             msg.textContent = 'Поздравляем! Все слова найдены!';
         }
     }
 
     function resetGame() {
-        foundWords.clear();
+        foundWords = [];
         selectedCells = [];
         document.getElementById('message').textContent = '';
         placeWords();
