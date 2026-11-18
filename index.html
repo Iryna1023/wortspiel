@@ -96,6 +96,7 @@
             font-weight: bold;
             color: #27ae60;
             font-size: 0.9rem;
+            min-height: 1.2rem;
         }
     </style>
 </head>
@@ -142,25 +143,51 @@
     function placeWords() {
         grid = Array(size).fill(null).map(() => Array(size).fill(''));
 
-        const placements = [
-            {r: 0, c: 0, h: true, w: "ARBEITEN"},
-            {r: 1, c: 0, h: true, w: "FIRMA"},
-            {r: 2, c: 0, h: true, w: "LEITEN"},
-            {r: 3, c: 0, h: true, w: "VERKAUFEN"},
-            {r: 4, c: 0, h: true, w: "KAUFEN"},
-            {r: 5, c: 0, h: true, w: "PLANEN"},
-            {r: 6, c: 0, h: true, w: "VERDIENEN"},
-            {r: 7, c: 0, h: true, w: "BEZAHLEN"},
-            {r: 8, c: 0, h: true, w: "BESTELLEN"},
-            {r: 9, c: 0, h: true, w: "LIEFERN"}
-        ];
+        // Рандомне розміщення слів по сітці (горизонтально або вертикально)
+        words.forEach(item => {
+            let word = item.de;
+            let placed = false;
+            let attempts = 0;
 
-        placements.forEach(p => {
-            for (let i = 0; i < p.w.length; i++) {
-                if (p.h) grid[p.r][p.c + i] = p.w[i];
+            while (!placed && attempts < 100) {
+                attempts++;
+                let horizontal = Math.random() < 0.5;
+                let r = Math.floor(Math.random() * size);
+                let c = Math.floor(Math.random() * size);
+
+                if (horizontal && c + word.length <= size) {
+                    let fit = true;
+                    for (let i = 0; i < word.length; i++) {
+                        if (grid[r][c + i] !== '' && grid[r][c + i] !== word[i]) {
+                            fit = false;
+                            break;
+                        }
+                    }
+                    if (fit) {
+                        for (let i = 0; i < word.length; i++) {
+                            grid[r][c + i] = word[i];
+                        }
+                        placed = true;
+                    }
+                } else if (!horizontal && r + word.length <= size) {
+                    let fit = true;
+                    for (let i = 0; i < word.length; i++) {
+                        if (grid[r + i][c] !== '' && grid[r + i][c] !== word[i]) {
+                            fit = false;
+                            break;
+                        }
+                    }
+                    if (fit) {
+                        for (let i = 0; i < word.length; i++) {
+                            grid[r + i][c] = word[i];
+                        }
+                        placed = true;
+                    }
+                }
             }
         });
 
+        // Заполняем пустоту случайными буквами
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (let r = 0; r < size; r++) {
             for (let c = 0; c < size; c++) {
@@ -181,7 +208,10 @@
                 cell.dataset.row = r;
                 cell.dataset.col = c;
                 cell.textContent = grid[r][c];
+                
+                // Зберігаємо звичний клік + додаємо підтримку тач-подій для телефонів
                 cell.onclick = () => toggleCell(cell, r, c);
+                
                 gridEl.appendChild(cell);
             }
         }
@@ -193,7 +223,39 @@
         words.forEach(w => {
             const li = document.createElement('li');
             li.className = 'word-item ' + (foundWords.has(w.de) ? 'found' : '');
-            li.textContent = `${w.de} — ${w.ru}`; listEl.appendChild(li); }); }  function toggleCell(cell, r, c) { if (cell.classList.contains('found')) return; cell.classList.toggle('selected'); const index = selectedCells.findIndex(item => item.r === r && item.c === c); if (index > -1) { selectedCells.splice(index, 1); } else { selectedCells.push({r, c}); } }  function checkSelection() { selectedCells.sort((a, b) => a.r - b.r \vert{}\vert{} a.c - b.c); let wordStr = selectedCells.map(item => grid[item.r][item.c]).join('');  let matched = words.find(w => w.de === wordStr \vert{}\vert{} w.de === wordStr.split('').reverse().join(''));  const msg = document.getElementById('message'); if (matched && !foundWords.has(matched.de)) { foundWords.add(matched.de); selectedCells.forEach(item => { const cellEl = document.querySelector(`[data-row='${item.r}'][data-col='${item.c}']`); if (cellEl) { cellEl.classList.remove('selected'); cellEl.classList.add('found'); } }); msg.textContent = `Найдено слово: ${matched.de}!`;
+            li.textContent = `${w.de} — ${w.ru}`;
+            listEl.appendChild(li);
+        });
+    }
+
+    function toggleCell(cell, r, c) {
+        if (cell.classList.contains('found')) return;
+        cell.classList.toggle('selected');
+        const index = selectedCells.findIndex(item => item.r === r && item.c === c);
+        if (index > -1) {
+            selectedCells.splice(index, 1);
+        } else {
+            selectedCells.push({r, c});
+        }
+    }
+
+    function checkSelection() {
+        selectedCells.sort((a, b) => a.r - b.r || a.c - b.c);
+        let wordStr = selectedCells.map(item => grid[item.r][item.c]).join('');
+        
+        let matched = words.find(w => w.de === wordStr || w.de === wordStr.split('').reverse().join(''));
+        
+        const msg = document.getElementById('message');
+        if (matched && !foundWords.has(matched.de)) {
+            foundWords.add(matched.de);
+            selectedCells.forEach(item => {
+                const cellEl = document.querySelector(`[data-row='${item.r}'][data-col='${item.c}']`);
+                if (cellEl) {
+                    cellEl.classList.remove('selected');
+                    cellEl.classList.add('found');
+                }
+            });
+            msg.textContent = `Найдено слово: ${matched.de}!`;
             setTimeout(() => msg.textContent = '', 2000);
         } else {
             msg.textContent = 'Неверно, попробуйте еще раз';
