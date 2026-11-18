@@ -13,7 +13,6 @@
             padding: 15px;
             margin: 0;
             -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
         h1 {
             color: #2c3e50;
@@ -48,7 +47,8 @@
             cursor: pointer;
             user-select: none;
             -webkit-user-select: none;
-            transition: background 0.2s;
+            touch-action: manipulation;
+            transition: background 0.15s;
         }
         .cell.selected {
             background: #3498db;
@@ -81,13 +81,14 @@
             justify-content: center;
         }
         button {
-            padding: 8px 14px;
+            padding: 10px 16px;
             border: none;
             background: #3498db;
             color: white;
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9rem;
+            touch-action: manipulation;
         }
         button:active {
             background: #2980b9;
@@ -142,28 +143,67 @@
     let foundWords = new Set();
 
     function placeWords() {
-        grid = Array(size).fill(null).map(() => Array(size).fill(''));
+        let success = false;
         
-        // Ваш оригінальний алгоритм розміщення
-        const placements = [
-            {r: 0, c: 0, h: true, w: "ARBEITEN"},
-            {r: 1, c: 0, h: true, w: "FIRMA"},
-            {r: 2, c: 0, h: true, w: "LEITEN"},
-            {r: 3, c: 0, h: true, w: "VERKAUFEN"},
-            {r: 4, c: 0, h: true, w: "KAUFEN"},
-            {r: 5, c: 0, h: true, w: "PLANEN"},
-            {r: 6, c: 0, h: true, w: "VERDIENEN"},
-            {r: 7, c: 0, h: true, w: "BEZAHLEN"},
-            {r: 8, c: 0, h: true, w: "BESTELLEN"},
-            {r: 9, c: 0, h: true, w: "LIEFERN"}
-        ];
+        // Намагаємося згенерувати сітку так, щоб гарантовано вмістилися всі 10 слів
+        while (!success) {
+            grid = Array(size).fill(null).map(() => Array(size).fill(''));
+            let placedCount = 0;
 
-        placements.forEach(p => {
-            for (let i = 0; i < p.w.length; i++) {
-                if (p.h) grid[p.r][p.c + i] = p.w[i];
+            // Сортуємо від найдовших слів до найкоротших — так вони завжди знаходять місце
+            const sortedWords = [...words].sort((a, b) => b.de.length - a.de.length);
+
+            for (let item of sortedWords) {
+                const word = item.de;
+                let placed = false;
+                let attempts = 0;
+
+                while (!placed && attempts < 200) {
+                    attempts++;
+                    const horizontal = Math.random() < 0.5;
+                    const r = Math.floor(Math.random() * size);
+                    const c = Math.floor(Math.random() * size);
+
+                    if (horizontal && c + word.length <= size) {
+                        let canPlace = true;
+                        for (let i = 0; i < word.length; i++) {
+                            if (grid[r][c + i] !== '' && grid[r][c + i] !== word[i]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (canPlace) {
+                            for (let i = 0; i < word.length; i++) {
+                                grid[r][c + i] = word[i];
+                            }
+                            placed = true;
+                            placedCount++;
+                        }
+                    } else if (!horizontal && r + word.length <= size) {
+                        let canPlace = true;
+                        for (let i = 0; i < word.length; i++) {
+                            if (grid[r + i][c] !== '' && grid[r + i][c] !== word[i]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (canPlace) {
+                            for (let i = 0; i < word.length; i++) {
+                                grid[r + i][c] = word[i];
+                            }
+                            placed = true;
+                            placedCount++;
+                        }
+                    }
+                }
             }
-        });
 
+            if (placedCount === words.length) {
+                success = true;
+            }
+        }
+
+        // Заповнюємо решту клітинок випадковими літерами
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (let r = 0; r < size; r++) {
             for (let c = 0; c < size; c++) {
@@ -184,14 +224,8 @@
                 cell.dataset.row = r;
                 cell.dataset.col = c;
                 cell.textContent = grid[r][c];
-                
-                // Працює і на ноутбуці (клік), і на телефоні (дотик)
-                cell.addEventListener('click', () => toggleCell(cell, r, c));
-                cell.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    toggleCell(cell, r, c);
-                }, { passive: false });
-
+                // Використовуємо тільки onclick + CSS touch-action: manipulation (жодних подвійних натискань на iOS/Android)
+                cell.onclick = () => toggleCell(cell, r, c);
                 gridEl.appendChild(cell);
             }
         }
@@ -235,6 +269,7 @@
                     cellEl.classList.add('found');
                 }
             });
+            msg.style.color = '#27ae60';
             msg.textContent = `Найдено слово: ${matched.de}!`;
             setTimeout(() => msg.textContent = '', 2000);
         } else {
@@ -250,6 +285,7 @@
         renderWordList();
 
         if (foundWords.size === words.length) {
+            msg.style.color = '#27ae60';
             msg.textContent = 'Поздравляем! Все слова найдены!';
         }
     }
