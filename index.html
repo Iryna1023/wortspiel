@@ -12,7 +12,6 @@
             text-align: center;
             padding: 20px;
             margin: 0;
-            -webkit-tap-highlight-color: transparent;
         }
         h1 {
             color: #2c3e50;
@@ -21,8 +20,6 @@
         }
         .container {
             max-width: 400px;
-            width: 100%;
-            box-sizing: border-box;
             margin: 0 auto;
             background: #fff;
             padding: 15px;
@@ -46,7 +43,6 @@
             border-radius: 4px;
             cursor: pointer;
             user-select: none;
-            -webkit-user-select: none;
             transition: background 0.2s;
         }
         .cell.selected {
@@ -142,7 +138,7 @@
     function placeWords() {
         grid = Array(size).fill(null).map(() => Array(size).fill(''));
 
-        // Упрощенное размещение по горизонтали и вертикали (ваш оригінальний код)
+        // Упрощенное размещение по горизонтали и вертикали
         const placements = [
             {r: 0, c: 0, h: true, w: "ARBEITEN"},
             {r: 1, c: 0, h: true, w: "FIRMA"},
@@ -183,7 +179,6 @@
                 cell.dataset.row = r;
                 cell.dataset.col = c;
                 cell.textContent = grid[r][c];
-                // Ваш точний оригінальний клік:
                 cell.onclick = () => toggleCell(cell, r, c);
                 gridEl.appendChild(cell);
             }
@@ -223,10 +218,8 @@
             foundWords.add(matched.de);
             selectedCells.forEach(item => {
                 const cellEl = document.querySelector(`[data-row='${item.r}'][data-col='${item.c}']`);
-                if (cellEl) {
-                    cellEl.classList.remove('selected');
-                    cellEl.classList.add('found');
-                }
+                cellEl.classList.remove('selected');
+                cellEl.classList.add('found');
             });
             msg.textContent = `Найдено слово: ${matched.de}!`;
             setTimeout(() => msg.textContent = '', 2000);
