@@ -62,13 +62,19 @@
             background: #2ecc71;
             color: white;
         }
+        .cell.found.overlap {
+            background: #196f3d;
+            color: white;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+        }
         .cell.selected {
             background: #3498db;
             color: white;
             transform: scale(1.04);
         }
-        .cell.found.selected {
-            background: #1abc9c;
+        .cell.found.selected,
+        .cell.found.overlap.selected {
+            background: #2471a3;
             color: white;
             box-shadow: inset 0 0 0 2px #ffffff;
         }
@@ -176,65 +182,138 @@
     let foundWords = new Set();
     let isSelecting = false;
 
+    function canPlaceAt(word, r, c, horizontal) {
+        if (horizontal) {
+            if (c < 0 || c + word.length > size || r < 0 || r >= size) return false;
+            for (let i = 0; i < word.length; i++) {
+                const existing = grid[r][c + i];
+                if (existing !== '' && existing !== word[i]) return false;
+            }
+        } else {
+            if (r < 0 || r + word.length > size || c < 0 || c >= size) return false;
+            for (let i = 0; i < word.length; i++) {
+                const existing = grid[r + i][c];
+                if (existing !== '' && existing !== word[i]) return false;
+            }
+        }
+        return true;
+    }
+
+    function commitPlacement(word, r, c, horizontal) {
+        const coords = [];
+        for (let i = 0; i < word.length; i++) {
+            const rr = horizontal ? r : r + i;
+            const cc = horizontal ? c + i : c;
+            grid[rr][cc] = word[i];
+            coords.push({ r: rr, c: cc });
+        }
+        wordPlacements[word] = coords;
+    }
+
+    function findCrossingCandidates(word, preferHorizontal) {
+        const candidates = [];
+        for (let i = 0; i < word.length; i++) {
+            const ch = word[i];
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (grid[r][c] === ch) {
+                        // Якщо літера знайдена — пробуємо провести слово горизонтально через неї
+                        const hCol = c - i;
+                        if (canPlaceAt(word, r, hCol, true)) {
+                            candidates.push({
+                                r,
+                                c: hCol,
+                                horizontal: true,
+                                weight: preferHorizontal ? 3 : 1
+                            });
+                        }
+                        // Або вертикально через неї
+                        const vRow = r - i;
+                        if (canPlaceAt(word, vRow, c, false)) {
+                            candidates.push({
+                                r: vRow,
+                                c,
+                                horizontal: false,
+                                weight: !preferHorizontal ? 3 : 1
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        return candidates;
+    }
+
+    function pickWeightedCandidate(candidates) {
+        const total = candidates.reduce((sum, item) => sum + item.weight, 0);
+        let roll = Math.random() * total;
+        for (const item of candidates) {
+            roll -= item.weight;
+            if (roll <= 0) return item;
+        }
+        return candidates[candidates.length - 1];
+    }
+
     function placeWords() {
         let success = false;
         while (!success) {
             grid = Array.from({ length: size }, () => Array(size).fill(''));
             wordPlacements = {};
             let placedCount = 0;
+            let horizCount = 0;
+            let vertCount = 0;
+
             const sortedWords = [...words].sort((a, b) => b.de.length - a.de.length);
 
-            for (const item of sortedWords) {
-                const word = item.de;
+            for (let idx = 0; idx < sortedWords.length; idx++) {
+                const word = sortedWords[idx].de;
                 let placed = false;
-                let attempts = 0;
 
+                // Балансуємо горизонтальні та вертикальні слова
+                let preferHorizontal;
+                if (horizCount < 3 && idx >= 2) {
+                    preferHorizontal = true;
+                } else if (vertCount < 3 && idx >= 2) {
+                    preferHorizontal = false;
+                } else {
+                    preferHorizontal = Math.random() < 0.5;
+                }
+
+                // Спочатку шукаємо варіанти з перетином інших слів (особливо після першого слова)
+                if (idx > 0 && Math.random() < 0.8) {
+                    const crosses = findCrossingCandidates(word, preferHorizontal);
+                    if (crosses.length > 0) {
+                        const chosen = pickWeightedCandidate(crosses);
+                        commitPlacement(word, chosen.r, chosen.c, chosen.horizontal);
+                        placed = true;
+                        placedCount++;
+                        if (chosen.horizontal) horizCount++;
+                        else vertCount++;
+                    }
+                }
+
+                // Якщо перетин не підібрано або задумано вільне місце — ставимо випадково
+                let attempts = 0;
                 while (!placed && attempts < 300) {
                     attempts++;
-                    const horizontal = Math.random() < 0.5;
+                    const horizontal = attempts < 150
+                        ? preferHorizontal
+                        : Math.random() < 0.5;
                     const r = Math.floor(Math.random() * size);
                     const c = Math.floor(Math.random() * size);
 
-                    if (horizontal && c + word.length <= size) {
-                        let canPlace = true;
-                        for (let i = 0; i < word.length; i++) {
-                            if (grid[r][c + i] !== '' && grid[r][c + i] !== word[i]) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-                        if (canPlace) {
-                            const coords = [];
-                            for (let i = 0; i < word.length; i++) {
-                                grid[r][c + i] = word[i];
-                                coords.push({ r, c: c + i });
-                            }
-                            wordPlacements[word] = coords;
-                            placed = true;
-                            placedCount++;
-                        }
-                    } else if (!horizontal && r + word.length <= size) {
-                        let canPlace = true;
-                        for (let i = 0; i < word.length; i++) {
-                            if (grid[r + i][c] !== '' && grid[r + i][c] !== word[i]) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-                        if (canPlace) {
-                            const coords = [];
-                            for (let i = 0; i < word.length; i++) {
-                                grid[r + i][c] = word[i];
-                                coords.push({ r: r + i, c });
-                            }
-                            wordPlacements[word] = coords;
-                            placed = true;
-                            placedCount++;
-                        }
+                    if (canPlaceAt(word, r, c, horizontal)) {
+                        commitPlacement(word, r, c, horizontal);
+                        placed = true;
+                        placedCount++;
+                        if (horizontal) horizCount++;
+                        else vertCount++;
                     }
                 }
             }
-            if (placedCount === words.length) {
+
+            // Перевіряємо, що всі слова розміщені і є хоча б по 2 слова кожного напрямку
+            if (placedCount === words.length && horizCount >= 2 && vertCount >= 2) {
                 success = true;
             }
         }
@@ -247,6 +326,32 @@
                 }
             }
         }
+    }
+
+    function updateFoundColors() {
+        const counts = Array.from({ length: size }, () => Array(size).fill(0));
+
+        foundWords.forEach(wordDe => {
+            const coords = wordPlacements[wordDe];
+            if (!coords) return;
+            coords.forEach(({ r, c }) => {
+                counts[r][c] += 1;
+            });
+        });
+
+        document.querySelectorAll('.cell').forEach(cellEl => {
+            const r = parseInt(cellEl.dataset.row, 10);
+            const c = parseInt(cellEl.dataset.col, 10);
+            const count = counts[r][c];
+
+            cellEl.classList.remove('found', 'overlap');
+            if (count >= 1) {
+                cellEl.classList.add('found');
+            }
+            if (count >= 2) {
+                cellEl.classList.add('overlap');
+            }
+        });
     }
 
     function renderGrid() {
@@ -398,8 +503,8 @@
             ordered.forEach(item => {
                 item.element.classList.remove('selected');
                 item.element.classList.remove('hint');
-                item.element.classList.add('found');
             });
+            updateFoundColors();
             msg.style.color = '#27ae60';
             msg.textContent = `Znaleziono słowo: ${matched.de}!`;
             setTimeout(() => {
