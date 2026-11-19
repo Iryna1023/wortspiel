@@ -177,37 +177,108 @@
 
     const size = 10;
     let grid = [];
+    let orientationGrid = []; // 'H' або 'V' для кожної зайнятої літери слова
     let wordPlacements = {};
     let selectedCells = [];
     let foundWords = new Set();
     let isSelecting = false;
 
-    function canPlaceAt(word, r, c, horizontal) {
-        if (horizontal) {
-            if (c < 0 || c + word.length > size || r < 0 || r >= size) return false;
-            for (let i = 0; i < word.length; i++) {
-                const existing = grid[r][c + i];
-                if (existing !== '' && existing !== word[i]) return false;
-            }
-        } else {
-            if (r < 0 || r + word.length > size || c < 0 || c >= size) return false;
-            for (let i = 0; i < word.length; i++) {
-                const existing = grid[r + i][c];
-                if (existing !== '' && existing !== word[i]) return false;
-            }
-        }
-        return true;
-    }
-
-    function commitPlacement(word, r, c, horizontal) {
+    function getWordCoords(word, r, c, horizontal) {
         const coords = [];
         for (let i = 0; i < word.length; i++) {
             const rr = horizontal ? r : r + i;
             const cc = horizontal ? c + i : c;
-            grid[rr][cc] = word[i];
-            coords.push({ r: rr, c: cc });
+            coords.push({ r: rr, c: cc, ch: word[i] });
         }
-        wordPlacements[word] = coords;
+        return coords;
+    }
+
+    function formsSubwordInLine(coords, horizontal) {
+        const lineStr = coords.map(item => item.ch).join('');
+        for (const item of words) {
+            const candidate = item.de;
+            if (candidate === lineStr) continue;
+            if (lineStr.includes(candidate) || candidate.includes(lineStr)) {
+                return true;
+            }
+        }
+
+        // Перевіряємо також повну лінію рядка або стовпця, щоб нове слово не створювало "слово в слові"
+        if (horizontal) {
+            const r = coords[0].r;
+            let rowStr = '';
+            for (let c = 0; c < size; c++) {
+                const onNew = coords.find(pt => pt.r === r && pt.c === c);
+                rowStr += onNew ? onNew.ch : (grid[r][c] || ' ');
+            }
+            const segments = rowStr.split(' ');
+            for (const seg of segments) {
+                if (seg.length < 2) continue;
+                for (const item of words) {
+                    if (seg !== item.de && (seg.includes(item.de) || item.de.includes(seg))) {
+                        return true;
+                    }
+                }
+            }
+        } else {
+            const c = coords[0].c;
+            let colStr = '';
+            for (let r = 0; r < size; r++) {
+                const onNew = coords.find(pt => pt.r === r && pt.c === c);
+                colStr += onNew ? onNew.ch : (grid[r][c] || ' ');
+            }
+            const segments = colStr.split(' ');
+            for (const seg of segments) {
+                if (seg.length < 2) continue;
+                for (const item of words) {
+                    if (seg !== item.de && (seg.includes(item.de) || item.de.includes(seg))) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function canPlaceAt(word, r, c, horizontal) {
+        if (horizontal) {
+            if (c < 0 || c + word.length > size || r < 0 || r >= size) return false;
+        } else {
+            if (r < 0 || r + word.length > size || c < 0 || c >= size) return false;
+        }
+
+        const dirTag = horizontal ? 'H' : 'V';
+        const coords = getWordCoords(word, r, c, horizontal);
+
+        for (let i = 0; i < coords.length; i++) {
+            const { r: rr, c: cc, ch } = coords[i];
+            const existingChar = grid[rr][cc];
+            const existingOrient = orientationGrid[rr][cc];
+
+            if (existingChar !== '') {
+                // Перетин дозволений лише на однаковій літері та з іншим напрямком (H з V або V з H)
+                if (existingChar !== ch) return false;
+                if (!existingOrient || existingOrient === dirTag) return false;
+            }
+        }
+
+        if (formsSubwordInLine(coords, horizontal)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function commitPlacement(word, r, c, horizontal) {
+        const dirTag = horizontal ? 'H' : 'V';
+        const coords = getWordCoords(word, r, c, horizontal);
+        for (let i = 0; i < coords.length; i++) {
+            const { r: rr, c: cc, ch } = coords[i];
+            grid[rr][cc] = ch;
+            orientationGrid[rr][cc] = dirTag;
+        }
+        wordPlacements[word] = coords.map(({ r: rr, c: cc }) => ({ r: rr, c: cc }));
     }
 
     function findCrossingCandidates(word, preferHorizontal) {
@@ -217,24 +288,24 @@
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
                     if (grid[r][c] === ch) {
-                        // Якщо літера знайдена — пробуємо провести слово горизонтально через неї
+                        // Перетин горизонтального слова з вертикальним (і навпаки)
                         const hCol = c - i;
-                        if (canPlaceAt(word, r, hCol, true)) {
+                        if (orientationGrid[r][c] === 'V' && canPlaceAt(word, r, hCol, true)) {
                             candidates.push({
                                 r,
                                 c: hCol,
                                 horizontal: true,
-                                weight: preferHorizontal ? 3 : 1
+                                weight: preferHorizontal ? 4 : 2
                             });
                         }
-                        // Або вертикально через неї
+
                         const vRow = r - i;
-                        if (canPlaceAt(word, vRow, c, false)) {
+                        if (orientationGrid[r][c] === 'H' && canPlaceAt(word, vRow, c, false)) {
                             candidates.push({
                                 r: vRow,
                                 c,
                                 horizontal: false,
-                                weight: !preferHorizontal ? 3 : 1
+                                weight: !preferHorizontal ? 4 : 2
                             });
                         }
                     }
@@ -256,8 +327,12 @@
 
     function placeWords() {
         let success = false;
-        while (!success) {
+        let outerAttempts = 0;
+
+        while (!success && outerAttempts < 250) {
+            outerAttempts++;
             grid = Array.from({ length: size }, () => Array(size).fill(''));
+            orientationGrid = Array.from({ length: size }, () => Array(size).fill(''));
             wordPlacements = {};
             let placedCount = 0;
             let horizCount = 0;
@@ -269,7 +344,6 @@
                 const word = sortedWords[idx].de;
                 let placed = false;
 
-                // Балансуємо горизонтальні та вертикальні слова
                 let preferHorizontal;
                 if (horizCount < 3 && idx >= 2) {
                     preferHorizontal = true;
@@ -279,8 +353,7 @@
                     preferHorizontal = Math.random() < 0.5;
                 }
 
-                // Спочатку шукаємо варіанти з перетином інших слів (особливо після першого слова)
-                if (idx > 0 && Math.random() < 0.8) {
+                if (idx > 0 && Math.random() < 0.85) {
                     const crosses = findCrossingCandidates(word, preferHorizontal);
                     if (crosses.length > 0) {
                         const chosen = pickWeightedCandidate(crosses);
@@ -292,11 +365,10 @@
                     }
                 }
 
-                // Якщо перетин не підібрано або задумано вільне місце — ставимо випадково
                 let attempts = 0;
-                while (!placed && attempts < 300) {
+                while (!placed && attempts < 350) {
                     attempts++;
-                    const horizontal = attempts < 150
+                    const horizontal = attempts < 175
                         ? preferHorizontal
                         : Math.random() < 0.5;
                     const r = Math.floor(Math.random() * size);
@@ -312,7 +384,6 @@
                 }
             }
 
-            // Перевіряємо, що всі слова розміщені і є хоча б по 2 слова кожного напрямку
             if (placedCount === words.length && horizCount >= 2 && vertCount >= 2) {
                 success = true;
             }
