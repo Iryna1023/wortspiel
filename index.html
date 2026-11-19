@@ -190,6 +190,25 @@
     let foundWords = new Set();
     let isSelecting = false;
     let hintIndex = 0;
+    let messageTimeout = null;
+
+    function setTemporaryMessage(text, color, durationMs) {
+        const msg = document.getElementById('message');
+        if (messageTimeout !== null) {
+            clearTimeout(messageTimeout);
+            messageTimeout = null;
+        }
+        msg.style.color = color;
+        msg.textContent = text;
+        if (durationMs && foundWords.size < words.length) {
+            messageTimeout = setTimeout(() => {
+                messageTimeout = null;
+                if (foundWords.size < words.length) {
+                    msg.textContent = '';
+                }
+            }, durationMs);
+        }
+    }
 
     function getWordCoords(word, r, c, horizontal) {
         const coords = [];
@@ -466,7 +485,6 @@
 
     function showHint() {
         const remainingWords = words.filter(w => !foundWords.has(w.de));
-        const msg = document.getElementById('message');
         if (remainingWords.length === 0) return;
 
         const safeIndex = hintIndex % remainingWords.length;
@@ -484,8 +502,7 @@
             cellEl.classList.add('hint');
         }
 
-        msg.style.color = '#d68910';
-        msg.textContent = `Pierwsza litera słowa „${targetWord.pl}”: ${grid[first.r][first.c]}`;
+        setTemporaryMessage(`Pierwsza litera słowa „${targetWord.pl}”: ${grid[first.r][first.c]}`, '#d68910', null);
     }
 
     const gridElement = document.getElementById('grid');
@@ -584,7 +601,6 @@
         const reversedStr = wordStr.split('').reverse().join('');
 
         const matched = words.find(w => w.de === wordStr || w.de === reversedStr);
-        const msg = document.getElementById('message');
 
         if (matched && !foundWords.has(matched.de)) {
             foundWords.add(matched.de);
@@ -593,21 +609,13 @@
                 item.element.classList.remove('hint');
             });
             updateFoundColors();
-            msg.style.color = '#27ae60';
-            msg.textContent = `Znaleziono słowo: ${matched.de}!`;
-            setTimeout(() => {
-                if (foundWords.size < words.length) {
-                    msg.textContent = '';
-                }
-            }, 2000);
+            setTemporaryMessage(`Znaleziono słowo: ${matched.de}!`, '#27ae60', 2000);
         } else {
-            msg.style.color = '#e74c3c';
-            msg.textContent = matched && foundWords.has(matched.de) ? 'To słowo już znaleziono' : 'Niepoprawnie';
-            setTimeout(() => {
-                if (foundWords.size < words.length) {
-                    msg.textContent = '';
-                }
-            }, 1500);
+            setTemporaryMessage(
+                matched && foundWords.has(matched.de) ? 'To słowo już znaleziono' : 'Niepoprawnie',
+                '#e74c3c',
+                1500
+            );
             clearSelectionUI();
         }
 
@@ -616,8 +624,7 @@
 
         if (foundWords.size === words.length) {
             document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
-            msg.style.color = '#27ae60';
-            msg.textContent = 'Brawo! Świetna robota — wszystkie słowa znalezione!';
+            setTemporaryMessage('Brawo! Świetna robota — wszystkie słowa znalezione!', '#27ae60', null);
             launchFireworks();
         }
     }
@@ -739,6 +746,10 @@
 
     function resetGame() {
         stopFireworks();
+        if (messageTimeout !== null) {
+            clearTimeout(messageTimeout);
+            messageTimeout = null;
+        }
         document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
         foundWords.clear();
         selectedCells = [];
