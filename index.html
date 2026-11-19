@@ -99,9 +99,9 @@
             display: flex;
             gap: 10px;
             justify-content: center;
-            flex-wrap: wrap;
         }
         button {
+            flex: 1;
             padding: 8px 14px;
             border: none;
             background: #3498db;
@@ -109,6 +109,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9rem;
+            text-align: center;
         }
         button:active {
             background: #2980b9;
@@ -177,7 +178,7 @@
 
     const size = 10;
     let grid = [];
-    let orientationGrid = [];
+    let orientationGrid = []; // 'H' або 'V' для кожної зайнятої літери слова
     let wordPlacements = {};
     let selectedCells = [];
     let foundWords = new Set();
@@ -204,6 +205,7 @@
             }
         }
 
+        // Перевіряємо також повну лінію рядка або стовпця, щоб нове слово не створювало "слово в слові"
         if (horizontal) {
             const r = coords[0].r;
             let rowStr = '';
@@ -257,6 +259,7 @@
             const existingOrient = orientationGrid[rr][cc];
 
             if (existingChar !== '') {
+                // Перетин дозволений лише на однаковій літері та з іншим напрямком (H з V або V з H)
                 if (existingChar !== ch) return false;
                 if (!existingOrient || existingOrient === dirTag) return false;
             }
@@ -287,6 +290,7 @@
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
                     if (grid[r][c] === ch) {
+                        // Перетин горизонтального слова з вертикальним (і навпаки)
                         const hCol = c - i;
                         if (orientationGrid[r][c] === 'V' && canPlaceAt(word, r, hCol, true)) {
                             candidates.push({
@@ -492,80 +496,4 @@
     }
 
     function clearSelectionUI() {
-        document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
-    }
-
-    function startSelection(cell) {
-        isSelecting = true;
-        selectedCells = [];
-        clearSelectionUI();
-        if (cell) {
-            addCellToSelection(cell);
-        }
-    }
-
-    function moveSelection(cell) {
-        if (!isSelecting || !cell) return;
-        addCellToSelection(cell);
-    }
-
-    function finishSelection(lastCell) {
-        if (!isSelecting) return;
-        if (lastCell) {
-            addCellToSelection(lastCell);
-        }
-        isSelecting = false;
-        checkSelection();
-    }
-
-    function handleMouseDown(e) {
-        if (e.button !== 0) return;
-        const cell = getCellFromPoint(e.clientX, e.clientY);
-        startSelection(cell);
-    }
-
-    function handleMouseMove(e) {
-        if (!isSelecting) return;
-        const cell = getCellFromPoint(e.clientX, e.clientY);
-        moveSelection(cell);
-    }
-
-    function handleMouseUp(e) {
-        if (!isSelecting) return;
-        const cell = getCellFromPoint(e.clientX, e.clientY);
-        finishSelection(cell);
-    }
-
-    function handleTouchStart(e) {
-        if (!e.touches || e.touches.length === 0) return;
-        const touch = e.touches[0];
-        const cell = getCellFromPoint(touch.clientX, touch.clientY);
-        startSelection(cell);
-    }
-
-    function handleTouchMove(e) {
-        if (!isSelecting || !e.touches || e.touches.length === 0) return;
-        const touch = e.touches[0];
-        const cell = getCellFromPoint(touch.clientX, touch.clientY);
-        moveSelection(cell);
-    }
-
-    function handleTouchEnd(e) {
-        if (!isSelecting) return;
-        let lastCell = null;
-        if (e.changedTouches && e.changedTouches.length > 0) {
-            const touch = e.changedTouches[0];
-            lastCell = getCellFromPoint(touch.clientX, touch.clientY);
-        }
-        finishSelection(lastCell);
-    }
-
-    function checkSelection() {
-        if (selectedCells.length === 0) return;
-
-        const ordered = [...selectedCells].sort((a, b) => a.r - b.r || a.c - b.c);
-        const wordStr = ordered.map(item => grid[item.r][item.c]).join('');
-        const reversedStr = wordStr.split('').reverse().join('');
-
-        const matched = words.find(w => w.de === wordStr || w.de === reversedStr);
-        const
+        document.querySelectorAll('.cell.selected').forEach(c => c.
