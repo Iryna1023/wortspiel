@@ -221,42 +221,7 @@
     }
 
     function createsEmbeddedWord(word, coords, horizontal) {
-        if (horizontal) {
-            const r = coords[0].r;
-            let rowStr = '';
-            for (let c = 0; c < size; c++) {
-                const onNew = coords.find(pt => pt.r === r && pt.c === c);
-                rowStr += onNew ? onNew.ch : (grid[r][c] || ' ');
-            }
-            const segments = rowStr.split(' ');
-            for (const seg of segments) {
-                if (seg.length < 2) continue;
-                for (const item of words) {
-                    if (seg === item.de) continue;
-                    if (seg.includes(item.de)) {
-                        return true;
-                    }
-                }
-            }
-        } else {
-            const c = coords[0].c;
-            let colStr = '';
-            for (let r = 0; r < size; r++) {
-                const onNew = coords.find(pt => pt.r === r && pt.c === c);
-                colStr += onNew ? onNew.ch : (grid[r][c] || ' ');
-            }
-            const segments = colStr.split(' ');
-            for (const seg of segments) {
-                if (seg.length < 2) continue;
-                for (const item of words) {
-                    if (seg === item.de) continue;
-                    if (seg.includes(item.de)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
+        // Забороняємо накладання слів у тому ж напрямку (щоб уникнути "слова в слові" типу KAUFEN у VERKAUFEN)
         for (const [placedWord, placedCoords] of Object.entries(wordPlacements)) {
             if (placedWord === word) continue;
             const sameRow = horizontal && placedCoords.every(pt => pt.r === coords[0].r);
@@ -271,7 +236,6 @@
                 }
             }
         }
-
         return false;
     }
 
@@ -362,7 +326,7 @@
         let success = false;
         let outerAttempts = 0;
 
-        while (!success && outerAttempts < 200) {
+        while (!success && outerAttempts < 250) {
             outerAttempts++;
             grid = Array.from({ length: size }, () => Array(size).fill(''));
             orientationGrid = Array.from({ length: size }, () => Array(size).fill(''));
@@ -399,9 +363,9 @@
                 }
 
                 let attempts = 0;
-                while (!placed && attempts < 300) {
+                while (!placed && attempts < 350) {
                     attempts++;
-                    const horizontal = attempts < 150
+                    const horizontal = attempts < 175
                         ? preferHorizontal
                         : Math.random() < 0.5;
                     const r = Math.floor(Math.random() * size);
@@ -518,15 +482,34 @@
         return element.classList.contains('cell') ? element : element.closest('.cell');
     }
 
-    function addCellToSelection(cell) {
-        if (!cell) return;
-        const r = parseInt(cell.dataset.row, 10);
-        const c = parseInt(cell.dataset.col, 10);
+    function buildStraightLineCells(start, end) {
+        const dr = end.r - start.r;
+        const dc = end.c - start.c;
 
-        if (!selectedCells.some(item => item.r === r && item.c === c)) {
-            selectedCells.push({ r, c, element: cell });
-            cell.classList.add('selected');
+        // Обираємо горизонталь або вертикаль залежно від того, куди більше змістився курсор/палець
+        if (Math.abs(dc) >= Math.abs(dr)) {
+            const step = dc >= 0 ? 1 : -1;
+            const line = [];
+            for (let c = start.c; step > 0 ? c <= end.c : c >= end.c; c += step) {
+                const el = document.querySelector(`.cell[data-row="${start.r}"][data-col="${c}"]`);
+                if (el) line.push({ r: start.r, c, element: el });
+            }
+            return line;
+        } else {
+            const step = dr >= 0 ? 1 : -1;
+            const line = [];
+            for (let r = start.r; step > 0 ? r <= end.r : r >= end.r; r += step) {
+                const el = document.querySelector(`.cell[data-row="${r}"][data-col="${start.c}"]`);
+                if (el) line.push({ r, c: start.c, element: el });
+            }
+            return line;
         }
+    }
+
+    function applyLineSelection(lineCells) {
+        clearSelectionUI();
+        selectedCells = lineCells;
+        selectedCells.forEach(item => item.element.classList.add('selected'));
     }
 
     function clearSelectionUI() {
@@ -534,23 +517,33 @@
     }
 
     function startSelection(cell) {
+        if (!cell) return;
         isSelecting = true;
-        selectedCells = [];
-        clearSelectionUI();
-        if (cell) {
-            addCellToSelection(cell);
-        }
+        const r = parseInt(cell.dataset.row, 10);
+        const c = parseInt(cell.dataset.col, 10);
+        selectedCells = [{ r, c, element: cell }];
+        applyLineSelection(selectedCells);
     }
 
     function moveSelection(cell) {
-        if (!isSelecting || !cell) return;
-        addCellToSelection(cell);
+        if (!isSelecting || !cell || selectedCells.length === 0) return;
+        const start = selectedCells[0];
+        const end = {
+            r: parseInt(cell.dataset.row, 10),
+            c: parseInt(cell.dataset.col, 10)
+        };
+        applyLineSelection(buildStraightLineCells(start, end));
     }
 
     function finishSelection(lastCell) {
         if (!isSelecting) return;
-        if (lastCell) {
-            addCellToSelection(lastCell);
+        if (lastCell && selectedCells.length > 0) {
+            const start = selectedCells[0];
+            const end = {
+                r: parseInt(lastCell.dataset.row, 10),
+                c: parseInt(lastCell.dataset.col, 10)
+            };
+            applyLineSelection(buildStraightLineCells(start, end));
         }
         isSelecting = false;
         checkSelection();
@@ -601,8 +594,7 @@
     function checkSelection() {
         if (selectedCells.length === 0) return;
 
-        const ordered = [...selectedCells].sort((a, b) => a.r - b.r || a.c - b.c);
-        const wordStr = ordered.map(item => grid[item.r][item.c]).join('').toUpperCase();
+        const wordStr = selectedCells.map(item => grid[item.r][item.c]).join('').toUpperCase();
         const reversedStr = wordStr.split('').reverse().join('');
 
         const matched = words.find(w => {
@@ -614,7 +606,7 @@
             const upperMatch = matched.de.toUpperCase();
             if (!foundWords.has(upperMatch)) {
                 foundWords.add(upperMatch);
-                ordered.forEach(item => {
+                selectedCells.forEach(item => {
                     item.element.classList.remove('selected');
                     item.element.classList.remove('hint');
                 });
