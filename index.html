@@ -62,19 +62,13 @@
             background: #2ecc71;
             color: white;
         }
-        .cell.found.overlap {
-            background: #196f3d;
-            color: white;
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
-        }
         .cell.selected {
             background: #3498db;
             color: white;
             transform: scale(1.04);
         }
-        .cell.found.selected,
-        .cell.found.overlap.selected {
-            background: #2471a3;
+        .cell.found.selected {
+            background: #1abc9c;
             color: white;
             box-shadow: inset 0 0 0 2px #ffffff;
         }
@@ -99,9 +93,9 @@
             display: flex;
             gap: 10px;
             justify-content: center;
+            flex-wrap: wrap;
         }
         button {
-            flex: 1;
             padding: 8px 14px;
             border: none;
             background: #3498db;
@@ -109,7 +103,6 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9rem;
-            text-align: center;
         }
         button:active {
             background: #2980b9;
@@ -178,215 +171,70 @@
 
     const size = 10;
     let grid = [];
-    let orientationGrid = []; // 'H' або 'V' для кожної зайнятої літери слова
     let wordPlacements = {};
     let selectedCells = [];
     let foundWords = new Set();
     let isSelecting = false;
-    let hintIndex = 0;
-
-    function getWordCoords(word, r, c, horizontal) {
-        const coords = [];
-        for (let i = 0; i < word.length; i++) {
-            const rr = horizontal ? r : r + i;
-            const cc = horizontal ? c + i : c;
-            coords.push({ r: rr, c: cc, ch: word[i] });
-        }
-        return coords;
-    }
-
-    function formsSubwordInLine(coords, horizontal) {
-        const lineStr = coords.map(item => item.ch).join('');
-        for (const item of words) {
-            const candidate = item.de;
-            if (candidate === lineStr) continue;
-            if (lineStr.includes(candidate) || candidate.includes(lineStr)) {
-                return true;
-            }
-        }
-
-        // Перевіряємо також повну лінію рядка або стовпця, щоб нове слово не створювало "слово в слові"
-        if (horizontal) {
-            const r = coords[0].r;
-            let rowStr = '';
-            for (let c = 0; c < size; c++) {
-                const onNew = coords.find(pt => pt.r === r && pt.c === c);
-                rowStr += onNew ? onNew.ch : (grid[r][c] || ' ');
-            }
-            const segments = rowStr.split(' ');
-            for (const seg of segments) {
-                if (seg.length < 2) continue;
-                for (const item of words) {
-                    if (seg !== item.de && (seg.includes(item.de) || item.de.includes(seg))) {
-                        return true;
-                    }
-                }
-            }
-        } else {
-            const c = coords[0].c;
-            let colStr = '';
-            for (let r = 0; r < size; r++) {
-                const onNew = coords.find(pt => pt.r === r && pt.c === c);
-                colStr += onNew ? onNew.ch : (grid[r][c] || ' ');
-            }
-            const segments = colStr.split(' ');
-            for (const seg of segments) {
-                if (seg.length < 2) continue;
-                for (const item of words) {
-                    if (seg !== item.de && (seg.includes(item.de) || item.de.includes(seg))) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    function canPlaceAt(word, r, c, horizontal) {
-        if (horizontal) {
-            if (c < 0 || c + word.length > size || r < 0 || r >= size) return false;
-        } else {
-            if (r < 0 || r + word.length > size || c < 0 || c >= size) return false;
-        }
-
-        const dirTag = horizontal ? 'H' : 'V';
-        const coords = getWordCoords(word, r, c, horizontal);
-
-        for (let i = 0; i < coords.length; i++) {
-            const { r: rr, c: cc, ch } = coords[i];
-            const existingChar = grid[rr][cc];
-            const existingOrient = orientationGrid[rr][cc];
-
-            if (existingChar !== '') {
-                // Перетин дозволений лише на однаковій літері та з іншим напрямком (H з V або V з H)
-                if (existingChar !== ch) return false;
-                if (!existingOrient || existingOrient === dirTag) return false;
-            }
-        }
-
-        if (formsSubwordInLine(coords, horizontal)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    function commitPlacement(word, r, c, horizontal) {
-        const dirTag = horizontal ? 'H' : 'V';
-        const coords = getWordCoords(word, r, c, horizontal);
-        for (let i = 0; i < coords.length; i++) {
-            const { r: rr, c: cc, ch } = coords[i];
-            grid[rr][cc] = ch;
-            orientationGrid[rr][cc] = dirTag;
-        }
-        wordPlacements[word] = coords.map(({ r: rr, c: cc }) => ({ r: rr, c: cc }));
-    }
-
-    function findCrossingCandidates(word, preferHorizontal) {
-        const candidates = [];
-        for (let i = 0; i < word.length; i++) {
-            const ch = word[i];
-            for (let r = 0; r < size; r++) {
-                for (let c = 0; c < size; c++) {
-                    if (grid[r][c] === ch) {
-                        // Перетин горизонтального слова з вертикальним (і навпаки)
-                        const hCol = c - i;
-                        if (orientationGrid[r][c] === 'V' && canPlaceAt(word, r, hCol, true)) {
-                            candidates.push({
-                                r,
-                                c: hCol,
-                                horizontal: true,
-                                weight: preferHorizontal ? 4 : 2
-                            });
-                        }
-
-                        const vRow = r - i;
-                        if (orientationGrid[r][c] === 'H' && canPlaceAt(word, vRow, c, false)) {
-                            candidates.push({
-                                r: vRow,
-                                c,
-                                horizontal: false,
-                                weight: !preferHorizontal ? 4 : 2
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        return candidates;
-    }
-
-    function pickWeightedCandidate(candidates) {
-        const total = candidates.reduce((sum, item) => sum + item.weight, 0);
-        let roll = Math.random() * total;
-        for (const item of candidates) {
-            roll -= item.weight;
-            if (roll <= 0) return item;
-        }
-        return candidates[candidates.length - 1];
-    }
 
     function placeWords() {
         let success = false;
-        let outerAttempts = 0;
-
-        while (!success && outerAttempts < 250) {
-            outerAttempts++;
+        while (!success) {
             grid = Array.from({ length: size }, () => Array(size).fill(''));
-            orientationGrid = Array.from({ length: size }, () => Array(size).fill(''));
             wordPlacements = {};
             let placedCount = 0;
-            let horizCount = 0;
-            let vertCount = 0;
-
             const sortedWords = [...words].sort((a, b) => b.de.length - a.de.length);
 
-            for (let idx = 0; idx < sortedWords.length; idx++) {
-                const word = sortedWords[idx].de;
+            for (const item of sortedWords) {
+                const word = item.de;
                 let placed = false;
-
-                let preferHorizontal;
-                if (horizCount < 3 && idx >= 2) {
-                    preferHorizontal = true;
-                } else if (vertCount < 3 && idx >= 2) {
-                    preferHorizontal = false;
-                } else {
-                    preferHorizontal = Math.random() < 0.5;
-                }
-
-                if (idx > 0 && Math.random() < 0.85) {
-                    const crosses = findCrossingCandidates(word, preferHorizontal);
-                    if (crosses.length > 0) {
-                        const chosen = pickWeightedCandidate(crosses);
-                        commitPlacement(word, chosen.r, chosen.c, chosen.horizontal);
-                        placed = true;
-                        placedCount++;
-                        if (chosen.horizontal) horizCount++;
-                        else vertCount++;
-                    }
-                }
-
                 let attempts = 0;
-                while (!placed && attempts < 350) {
+
+                while (!placed && attempts < 300) {
                     attempts++;
-                    const horizontal = attempts < 175
-                        ? preferHorizontal
-                        : Math.random() < 0.5;
+                    const horizontal = Math.random() < 0.5;
                     const r = Math.floor(Math.random() * size);
                     const c = Math.floor(Math.random() * size);
 
-                    if (canPlaceAt(word, r, c, horizontal)) {
-                        commitPlacement(word, r, c, horizontal);
-                        placed = true;
-                        placedCount++;
-                        if (horizontal) horizCount++;
-                        else vertCount++;
+                    if (horizontal && c + word.length <= size) {
+                        let canPlace = true;
+                        for (let i = 0; i < word.length; i++) {
+                            if (grid[r][c + i] !== '' && grid[r][c + i] !== word[i]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (canPlace) {
+                            const coords = [];
+                            for (let i = 0; i < word.length; i++) {
+                                grid[r][c + i] = word[i];
+                                coords.push({ r, c: c + i });
+                            }
+                            wordPlacements[word] = coords;
+                            placed = true;
+                            placedCount++;
+                        }
+                    } else if (!horizontal && r + word.length <= size) {
+                        let canPlace = true;
+                        for (let i = 0; i < word.length; i++) {
+                            if (grid[r + i][c] !== '' && grid[r + i][c] !== word[i]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (canPlace) {
+                            const coords = [];
+                            for (let i = 0; i < word.length; i++) {
+                                grid[r + i][c] = word[i];
+                                coords.push({ r: r + i, c });
+                            }
+                            wordPlacements[word] = coords;
+                            placed = true;
+                            placedCount++;
+                        }
                     }
                 }
             }
-
-            if (placedCount === words.length && horizCount >= 2 && vertCount >= 2) {
+            if (placedCount === words.length) {
                 success = true;
             }
         }
@@ -399,32 +247,6 @@
                 }
             }
         }
-    }
-
-    function updateFoundColors() {
-        const counts = Array.from({ length: size }, () => Array(size).fill(0));
-
-        foundWords.forEach(wordDe => {
-            const coords = wordPlacements[wordDe];
-            if (!coords) return;
-            coords.forEach(({ r, c }) => {
-                counts[r][c] += 1;
-            });
-        });
-
-        document.querySelectorAll('.cell').forEach(cellEl => {
-            const r = parseInt(cellEl.dataset.row, 10);
-            const c = parseInt(cellEl.dataset.col, 10);
-            const count = counts[r][c];
-
-            cellEl.classList.remove('found', 'overlap');
-            if (count >= 1) {
-                cellEl.classList.add('found');
-            }
-            if (count >= 2) {
-                cellEl.classList.add('overlap');
-            }
-        });
     }
 
     function renderGrid() {
@@ -454,14 +276,11 @@
     }
 
     function showHint() {
-        const remainingWords = words.filter(w => !foundWords.has(w.de));
+        const remaining = words.find(w => !foundWords.has(w.de));
         const msg = document.getElementById('message');
-        if (remainingWords.length === 0) return;
+        if (!remaining) return;
 
-        const targetWord = remainingWords[hintIndex % remainingWords.length];
-        hintIndex = (hintIndex + 1) % remainingWords.length;
-
-        const coords = wordPlacements[targetWord.de];
+        const coords = wordPlacements[remaining.de];
         if (!coords || coords.length === 0) return;
 
         document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
@@ -473,7 +292,7 @@
         }
 
         msg.style.color = '#d68910';
-        msg.textContent = `Pierwsza litera słowa „${targetWord.pl}”: ${grid[first.r][first.c]}`;
+        msg.textContent = `Pierwsza litera słowa „${remaining.pl}”: ${grid[first.r][first.c]}`;
     }
 
     const gridElement = document.getElementById('grid');
@@ -496,4 +315,250 @@
     }
 
     function clearSelectionUI() {
-        document.querySelectorAll('.cell.selected').forEach(c => c.
+        document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
+    }
+
+    function startSelection(cell) {
+        isSelecting = true;
+        selectedCells = [];
+        clearSelectionUI();
+        if (cell) {
+            addCellToSelection(cell);
+        }
+    }
+
+    function moveSelection(cell) {
+        if (!isSelecting || !cell) return;
+        addCellToSelection(cell);
+    }
+
+    function finishSelection(lastCell) {
+        if (!isSelecting) return;
+        if (lastCell) {
+            addCellToSelection(lastCell);
+        }
+        isSelecting = false;
+        checkSelection();
+    }
+
+    function handleMouseDown(e) {
+        if (e.button !== 0) return;
+        const cell = getCellFromPoint(e.clientX, e.clientY);
+        startSelection(cell);
+    }
+
+    function handleMouseMove(e) {
+        if (!isSelecting) return;
+        const cell = getCellFromPoint(e.clientX, e.clientY);
+        moveSelection(cell);
+    }
+
+    function handleMouseUp(e) {
+        if (!isSelecting) return;
+        const cell = getCellFromPoint(e.clientX, e.clientY);
+        finishSelection(cell);
+    }
+
+    function handleTouchStart(e) {
+        if (!e.touches || e.touches.length === 0) return;
+        const touch = e.touches[0];
+        const cell = getCellFromPoint(touch.clientX, touch.clientY);
+        startSelection(cell);
+    }
+
+    function handleTouchMove(e) {
+        if (!isSelecting || !e.touches || e.touches.length === 0) return;
+        const touch = e.touches[0];
+        const cell = getCellFromPoint(touch.clientX, touch.clientY);
+        moveSelection(cell);
+    }
+
+    function handleTouchEnd(e) {
+        if (!isSelecting) return;
+        let lastCell = null;
+        if (e.changedTouches && e.changedTouches.length > 0) {
+            const touch = e.changedTouches[0];
+            lastCell = getCellFromPoint(touch.clientX, touch.clientY);
+        }
+        finishSelection(lastCell);
+    }
+
+    function checkSelection() {
+        if (selectedCells.length === 0) return;
+
+        const ordered = [...selectedCells].sort((a, b) => a.r - b.r || a.c - b.c);
+        const wordStr = ordered.map(item => grid[item.r][item.c]).join('');
+        const reversedStr = wordStr.split('').reverse().join('');
+
+        const matched = words.find(w => w.de === wordStr || w.de === reversedStr);
+        const msg = document.getElementById('message');
+
+        if (matched && !foundWords.has(matched.de)) {
+            foundWords.add(matched.de);
+            ordered.forEach(item => {
+                item.element.classList.remove('selected');
+                item.element.classList.remove('hint');
+                item.element.classList.add('found');
+            });
+            msg.style.color = '#27ae60';
+            msg.textContent = `Znaleziono słowo: ${matched.de}!`;
+            setTimeout(() => {
+                if (foundWords.size < words.length) {
+                    msg.textContent = '';
+                }
+            }, 2000);
+        } else {
+            msg.style.color = '#e74c3c';
+            msg.textContent = matched && foundWords.has(matched.de) ? 'To słowo już znaleziono' : 'Niepoprawnie';
+            setTimeout(() => {
+                if (foundWords.size < words.length) {
+                    msg.textContent = '';
+                }
+            }, 1500);
+            clearSelectionUI();
+        }
+
+        selectedCells = [];
+        renderWordList();
+
+        if (foundWords.size === words.length) {
+            document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
+            msg.style.color = '#27ae60';
+            msg.textContent = 'Brawo! Świetna robota — wszystkie słowa znalezione!';
+            launchFireworks();
+        }
+    }
+
+    gridElement.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    gridElement.addEventListener('touchstart', handleTouchStart, { passive: true });
+    gridElement.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
+
+    // --- Анімація салюту ---
+    const canvas = document.getElementById('fireworksCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let fireworksTimer = null;
+    let animationFrameId = null;
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function createBurst(x, y) {
+        const colors = ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ff6b81', '#eccc68', '#a55eea'];
+        const count = 45;
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.2;
+            const speed = 2 + Math.random() * 5;
+            particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                alpha: 1,
+                decay: 0.015 + Math.random() * 0.015,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                radius: 2.5 + Math.random() * 2.5
+            });
+        }
+    }
+
+    function animateFireworks() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.99;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        if (particles.length > 0 || fireworksTimer !== null) {
+            animationFrameId = requestAnimationFrame(animateFireworks);
+        } else {
+            canvas.style.display = 'none';
+        }
+    }
+
+    function launchFireworks() {
+        stopFireworks();
+        resizeCanvas();
+        canvas.style.display = 'block';
+
+        const spawnBurst = () => {
+            const x = canvas.width * (0.2 + Math.random() * 0.6);
+            const y = canvas.height * (0.15 + Math.random() * 0.45);
+            createBurst(x, y);
+        };
+
+        spawnBurst();
+        setTimeout(spawnBurst, 350);
+        setTimeout(spawnBurst, 700);
+
+        let burstsLeft = 6;
+        fireworksTimer = setInterval(() => {
+            spawnBurst();
+            burstsLeft--;
+            if (burstsLeft <= 0) {
+                clearInterval(fireworksTimer);
+                fireworksTimer = null;
+            }
+        }, 550);
+
+        animationFrameId = requestAnimationFrame(animateFireworks);
+    }
+
+    function stopFireworks() {
+        if (fireworksTimer !== null) {
+            clearInterval(fireworksTimer);
+            fireworksTimer = null;
+        }
+        if (animationFrameId !== null) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        particles = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.display = 'none';
+    }
+
+    function resetGame() {
+        stopFireworks();
+        document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
+        foundWords.clear();
+        selectedCells = [];
+        isSelecting = false;
+        document.getElementById('message').textContent = '';
+        placeWords();
+        renderGrid();
+        renderWordList();
+    }
+
+    resetGame();
+</script>
+
+</body>
+</html>
