@@ -304,14 +304,15 @@
     }
 
     function commitPlacement(word, r, c, horizontal) {
+        const key = word.toUpperCase();
         const dirTag = horizontal ? 'H' : 'V';
-        const coords = getWordCoords(word, r, c, horizontal);
+        const coords = getWordCoords(key, r, c, horizontal);
         for (let i = 0; i < coords.length; i++) {
             const { r: rr, c: cc, ch } = coords[i];
             grid[rr][cc] = ch;
             orientationGrid[rr][cc] = dirTag;
         }
-        wordPlacements[word] = coords.map(({ r: rr, c: cc }) => ({ r: rr, c: cc }));
+        wordPlacements[key] = coords.map(({ r: rr, c: cc }) => ({ r: rr, c: cc }));
     }
 
     function findCrossingCandidates(word, preferHorizontal) {
@@ -373,7 +374,7 @@
             const sortedWords = [...words].sort((a, b) => b.de.length - a.de.length);
 
             for (let idx = 0; idx < sortedWords.length; idx++) {
-                const word = sortedWords[idx].de;
+                const word = sortedWords[idx].de.toUpperCase();
                 let placed = false;
 
                 let preferHorizontal;
@@ -435,7 +436,7 @@
         const counts = Array.from({ length: size }, () => Array(size).fill(0));
 
         foundWords.forEach(wordDe => {
-            const coords = wordPlacements[wordDe];
+            const coords = wordPlacements[wordDe.toUpperCase()];
             if (!coords) return;
             coords.forEach(({ r, c }) => {
                 counts[r][c] += 1;
@@ -476,33 +477,37 @@
         const listEl = document.getElementById('wordListUI');
         listEl.innerHTML = '';
         words.forEach(w => {
+            const key = w.de.toUpperCase();
             const li = document.createElement('li');
-            li.className = 'word-item' + (foundWords.has(w.de) ? ' found' : '');
-            li.textContent = `${w.de} — ${w.pl}`;
+            li.className = 'word-item' + (foundWords.has(key) ? ' found' : '');
+            li.textContent = `${key} — ${w.pl}`;
             listEl.appendChild(li);
         });
     }
 
     function showHint() {
-        const remainingWords = words.filter(w => !foundWords.has(w.de));
+        const remainingWords = words.filter(w => !foundWords.has(w.de.toUpperCase()));
         if (remainingWords.length === 0) return;
 
         const safeIndex = hintIndex % remainingWords.length;
         const targetWord = remainingWords[safeIndex];
         hintIndex = (safeIndex + 1) % remainingWords.length;
 
-        const coords = wordPlacements[targetWord.de];
-        if (!coords || coords.length === 0) return;
+        const upperWord = targetWord.de.toUpperCase();
+        const coords = wordPlacements[upperWord];
 
         document.querySelectorAll('.cell.hint').forEach(c => c.classList.remove('hint'));
 
-        const first = coords[0];
-        const cellEl = document.querySelector(`.cell[data-row="${first.r}"][data-col="${first.c}"]`);
-        if (cellEl) {
-            cellEl.classList.add('hint');
+        if (coords && coords.length > 0) {
+            const first = coords[0];
+            const cellEl = document.querySelector(`.cell[data-row="${first.r}"][data-col="${first.c}"]`);
+            if (cellEl) {
+                cellEl.classList.add('hint');
+            }
+            setTemporaryMessage(`Pierwsza litera słowa „${targetWord.pl}”: ${grid[first.r][first.c]}`, '#d68910', null);
+        } else {
+            setTemporaryMessage(`Pierwsza litera słowa „${targetWord.pl}”: ${upperWord[0]}`, '#d68910', null);
         }
-
-        setTemporaryMessage(`Pierwsza litera słowa „${targetWord.pl}”: ${grid[first.r][first.c]}`, '#d68910', null);
     }
 
     const gridElement = document.getElementById('grid');
@@ -597,25 +602,30 @@
         if (selectedCells.length === 0) return;
 
         const ordered = [...selectedCells].sort((a, b) => a.r - b.r || a.c - b.c);
-        const wordStr = ordered.map(item => grid[item.r][item.c]).join('');
+        const wordStr = ordered.map(item => grid[item.r][item.c]).join('').toUpperCase();
         const reversedStr = wordStr.split('').reverse().join('');
 
-        const matched = words.find(w => w.de === wordStr || w.de === reversedStr);
+        const matched = words.find(w => {
+            const u = w.de.toUpperCase();
+            return u === wordStr || u === reversedStr;
+        });
 
-        if (matched && !foundWords.has(matched.de)) {
-            foundWords.add(matched.de);
-            ordered.forEach(item => {
-                item.element.classList.remove('selected');
-                item.element.classList.remove('hint');
-            });
-            updateFoundColors();
-            setTemporaryMessage(`Znaleziono słowo: ${matched.de}!`, '#27ae60', 2000);
+        if (matched) {
+            const upperMatch = matched.de.toUpperCase();
+            if (!foundWords.has(upperMatch)) {
+                foundWords.add(upperMatch);
+                ordered.forEach(item => {
+                    item.element.classList.remove('selected');
+                    item.element.classList.remove('hint');
+                });
+                updateFoundColors();
+                setTemporaryMessage(`Znaleziono słowo: ${upperMatch}!`, '#27ae60', 2000);
+            } else {
+                setTemporaryMessage('To słowo już znaleziono', '#e74c3c', 1500);
+                clearSelectionUI();
+            }
         } else {
-            setTemporaryMessage(
-                matched && foundWords.has(matched.de) ? 'To słowo już znaleziono' : 'Niepoprawnie',
-                '#e74c3c',
-                1500
-            );
+            setTemporaryMessage('Niepoprawnie', '#e74c3c', 1500);
             clearSelectionUI();
         }
 
